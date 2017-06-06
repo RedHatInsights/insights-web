@@ -1,0 +1,16 @@
+backports-abc==0.5
+certifi==2017.4.17
+click==6.7
+-e git+git@github.com:RedHatInsights/insights-core.git@4fcf7f4f61b96880ad7f67909708f4a8e0ea2cf8#egg=falafel
+Flask==0.12.1
+futures==3.0.5
+itsdangerous==0.24
+Jinja2==2.9.6
+MarkupSafe==1.0
+PyYAML==3.12
+requests==2.13.0
+singledispatch==3.4.0.3
+six==1.10.0
+tornado==4.5.1
+uWSGI==2.0.15
+Werkzeug==0.12.2

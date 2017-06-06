@@ -1,0 +1,9 @@
+bin/
+include/
+build/
+dist/
+lib/
+lib64
+pip-selfcheck.json
+*.egg-info/
+*.pyc
