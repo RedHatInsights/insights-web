@@ -1,7 +1,7 @@
 backports-abc==0.5
 certifi==2017.4.17
 click==6.7
--e git+git@github.com:RedHatInsights/insights-core.git@4fcf7f4f61b96880ad7f67909708f4a8e0ea2cf8#egg=falafel
+-e git+git@github.com:RedHatInsights/insights-core.git@1.x#egg=insights-core
 Flask==0.12.1
 futures==3.0.5
 itsdangerous==0.24

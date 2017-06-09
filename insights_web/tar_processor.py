@@ -4,9 +4,9 @@ import os
 import json
 import logging
 
-from falafel import util
-from falafel.core import archives, specs, evaluators
-from falafel.core.archives import InvalidArchive
+from insights import util
+from insights.core import archives, specs, evaluators
+from insights.core.archives import InvalidArchive
 
 logger = logging.getLogger(__name__)
 uploader_logger = logging.getLogger("upload_client")

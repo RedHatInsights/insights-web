@@ -1,4 +1,4 @@
-from setuptools import setup, find_packages
+from setuptools import setup
 
 if __name__ == "__main__":
     setup(
@@ -7,7 +7,7 @@ if __name__ == "__main__":
         description="Insights Web",
         packages=["insights_web"],
         install_requires=[
-            'falafel',
+            'insights-core',
             'flask==0.12.1',
             'uWSGI==2.0.15'
         ]

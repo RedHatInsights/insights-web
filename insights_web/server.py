@@ -2,14 +2,14 @@ import os
 import logging
 import time
 import platform
-import falafel
+import insights
 import shutil
 import tempfile
 import uuid
 from flask import Flask, json, request, jsonify
 from collections import defaultdict
-from falafel.settings import web as config
-from falafel.core import plugins
+from insights.settings import web as config
+from insights.core import plugins
 from . import tar_processor
 
 stats = defaultdict(int)
@@ -71,9 +71,9 @@ def handle_error(error):
 def status():
     if "versions" not in stats:
         versions = stats["versions"] = {}
-        versions["falafel"] = {"version": falafel.get_nvr(),
-                               "commit": falafel.package_info["COMMIT"]}
-        versions.update(falafel.RULES_STATUS)
+        versions["insights-core"] = {"version": insights.get_nvr(),
+                                     "commit": insights.package_info["COMMIT"]}
+        versions.update(insights.RULES_STATUS)
     stats["uptime"] = format_seconds(time.time() - stats["start_time"])
     return jsonify(stats)
 
