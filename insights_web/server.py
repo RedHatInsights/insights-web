@@ -1,10 +1,7 @@
-import os
 import logging
 import time
 import platform
 import insights
-import shutil
-import tempfile
 import uuid
 from flask import Flask, json, request, jsonify
 from collections import defaultdict
@@ -12,7 +9,6 @@ from insights.settings import web as config
 from insights.core import plugins
 from insights.core import archives, specs
 from insights.core.evaluators import InsightsEvaluator, SingleEvaluator, InsightsMultiEvaluator
-from insights.core.archives import InvalidArchive
 
 stats = defaultdict(int)
 stats["start_time"] = time.time()
@@ -64,40 +60,36 @@ class EngineError(Exception):
         self.status_code = status_code
 
 
-def get_file_size(file_loc):
-    file_size = os.stat(file_loc).st_size
+def verify_file_size(file_size):
     if file_size > MAX_UPLOAD_SIZE:
         error_msg = "Upload is too big. %s/%s bytes" % (file_size, MAX_UPLOAD_SIZE)
         raise EngineError(error_msg, 413)
     if file_size == 0:
         raise EngineError("Upload has an empty archive body.", 400)
-    return file_size
 
 
-def save_file():
+def extract():
     if "file" not in request.files:
         raise EngineError("No 'file' key found in form part", 400)
-    file_loc = os.path.join(tempfile.mkdtemp(), "tmp.tar.gz")
-    request.files["file"].save(file_loc)
-    return file_loc
+    buf = request.files["file"].read()
+    buf_size = len(buf)
+    verify_file_size(buf_size)
+    return archives.TarExtractor().from_buffer(buf), buf_size
 
 
-def handle(filename, system_id=None, account=None, config=None):
-    with archives.TarExtractor() as ex:
-        arc = ex.from_path(filename)
-        os.unlink(filename)
-        spec_mapper = specs.SpecMapper(arc)
+def handle(extractor, system_id=None, account=None, config=None):
+    spec_mapper = specs.SpecMapper(extractor)
 
-        md_str = spec_mapper.get_content("metadata.json", split=False, default="{}")
-        md = json.loads(md_str)
+    md_str = spec_mapper.get_content("metadata.json", split=False, default="{}")
+    md = json.loads(md_str)
 
-        if md and 'systems' in md:
-            runner = InsightsMultiEvaluator(spec_mapper, system_id, md)
-        elif spec_mapper.get_content("machine-id"):
-            runner = InsightsEvaluator(spec_mapper, system_id=system_id)
-        else:
-            runner = SingleEvaluator(spec_mapper)
-        return runner.process()
+    if md and 'systems' in md:
+        runner = InsightsMultiEvaluator(spec_mapper, system_id, md)
+    elif spec_mapper.get_content("machine-id"):
+        runner = InsightsEvaluator(spec_mapper, system_id=system_id)
+    else:
+        runner = SingleEvaluator(spec_mapper)
+    return runner.process()
 
 
 def handle_results(results, file_size, user_agent):
@@ -143,11 +135,10 @@ def status():
 @app.route("/upload/<system_id>", methods=["POST"])
 def upload(system_id):
     user_agent = request.headers.get("User-Agent", "Unknown")
-    file_loc = save_file()
-    file_size = get_file_size(file_loc)
-    results = handle(file_loc, system_id, config=config)
-    shutil.rmtree(os.path.dirname(file_loc))
+    extractor, file_size = extract()
+    results = handle(extractor, system_id, config=config)
     response = handle_results(results, file_size, user_agent)
+    extractor.cleanup()
     update_stats(results, user_agent)
     return response
 
