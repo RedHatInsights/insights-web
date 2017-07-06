@@ -3,6 +3,9 @@ import time
 import platform
 import insights
 import uuid
+import tempfile
+import os
+import shutil
 from flask import Flask, json, request, jsonify
 from collections import defaultdict
 from insights.settings import web as config
@@ -71,10 +74,13 @@ def verify_file_size(file_size):
 def extract():
     if "file" not in request.files:
         raise EngineError("No 'file' key found in form part", 400)
-    buf = request.files["file"].read()
-    buf_size = len(buf)
-    verify_file_size(buf_size)
-    return archives.TarExtractor().from_buffer(buf), buf_size
+    file_loc = os.path.join(tempfile.mkdtemp(), "tmp.tar.gz")
+    request.files["file"].save(file_loc)
+    file_size = os.stat(file_loc).st_size
+    verify_file_size(file_size)
+    extractor = archives.TarExtractor().from_path(file_loc)
+    shutil.rmtree(os.path.dirname(file_loc))
+    return extractor, file_size
 
 
 def handle(extractor, system_id=None, account=None, config=None):
