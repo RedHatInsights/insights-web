@@ -83,27 +83,21 @@ def save_file():
 
 
 def handle(filename, system_id=None, account=None, config=None):
-    try:
-        with archives.TarExtractor() as ex:
-            arc = ex.from_path(filename)
-            os.unlink(filename)
-            spec_mapper = specs.SpecMapper(arc)
+    with archives.TarExtractor() as ex:
+        arc = ex.from_path(filename)
+        os.unlink(filename)
+        spec_mapper = specs.SpecMapper(arc)
 
-            md_str = spec_mapper.get_content("metadata.json", split=False, default="{}")
-            md = json.loads(md_str)
+        md_str = spec_mapper.get_content("metadata.json", split=False, default="{}")
+        md = json.loads(md_str)
 
-            if md and 'systems' in md:
-                runner = InsightsMultiEvaluator(spec_mapper, system_id, md)
-            elif spec_mapper.get_content("machine-id"):
-                runner = InsightsEvaluator(spec_mapper, system_id=system_id)
-            else:
-                runner = SingleEvaluator(spec_mapper)
-            return runner.process()
-    except InvalidArchive:
-        raise
-    except:
-        logger.exception("Exception encountered during _handle")
-        raise
+        if md and 'systems' in md:
+            runner = InsightsMultiEvaluator(spec_mapper, system_id, md)
+        elif spec_mapper.get_content("machine-id"):
+            runner = InsightsEvaluator(spec_mapper, system_id=system_id)
+        else:
+            runner = SingleEvaluator(spec_mapper)
+        return runner.process()
 
 
 def handle_results(results, file_size, user_agent):
