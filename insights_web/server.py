@@ -10,7 +10,7 @@ from flask import Flask, json, request, jsonify
 from collections import defaultdict
 from insights.settings import web as config
 from insights.core import plugins
-from insights.core import archives, specs, evaluators
+from insights.core import archives, specs
 from insights.core.evaluators import InsightsEvaluator, SingleEvaluator, InsightsMultiEvaluator
 from insights.core.archives import InvalidArchive
 
@@ -58,13 +58,6 @@ def initialize_logging():
     logging.getLogger("statsd").setLevel(logging.FATAL)
 
 
-class SoSReportEvaluator(SingleEvaluator):
-
-    def format_response(self, response):
-        evaluators.serialize_skips(response["skips"])
-        return response
-
-
 class EngineError(Exception):
     def __init__(self, message, status_code=500):
         super(EngineError, self).__init__(message)
@@ -104,7 +97,7 @@ def handle(filename, system_id=None, account=None, config=None):
             elif spec_mapper.get_content("machine-id"):
                 runner = InsightsEvaluator(spec_mapper, system_id=system_id)
             else:
-                runner = SoSReportEvaluator(spec_mapper)
+                runner = SingleEvaluator(spec_mapper)
             return runner.process()
     except InvalidArchive:
         raise
