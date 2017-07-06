@@ -10,7 +10,6 @@ from flask import Flask, json, request, jsonify
 from collections import defaultdict
 from insights.settings import web as config
 from insights.core import plugins
-from insights import util
 from insights.core import archives, specs, evaluators
 from insights.core.evaluators import InsightsEvaluator, SingleEvaluator, InsightsMultiEvaluator
 from insights.core.archives import InvalidArchive
@@ -59,19 +58,6 @@ def initialize_logging():
     logging.getLogger("statsd").setLevel(logging.FATAL)
 
 
-class UploaderLogEvaluator(InsightsEvaluator):
-
-    def post_process(self):
-        uploader_log_content = self.spec_mapper.get_content("uploader_log")
-        if uploader_log_content:
-            path = util.get_path_for_system_id("uploader_log", self.system_id) + ".log"
-            util.ensure_dir(path, dirname=True)
-            with open(path, 'w') as log_fp:
-                log_fp.write("\n".join(uploader_log_content))
-                log_url = "%s/uploader_logs/%s" % (util.get_addr(), self.system_id)
-                logger.info("Uploader Log for system [%s] is available: %s", self.system_id, log_url)
-
-
 class SoSReportEvaluator(SingleEvaluator):
 
     def format_response(self, response):
@@ -116,7 +102,7 @@ def handle(filename, system_id=None, account=None, config=None):
             if md and 'systems' in md:
                 runner = InsightsMultiEvaluator(spec_mapper, system_id, md)
             elif spec_mapper.get_content("machine-id"):
-                runner = UploaderLogEvaluator(spec_mapper, system_id=system_id)
+                runner = InsightsEvaluator(spec_mapper, system_id=system_id)
             else:
                 runner = SoSReportEvaluator(spec_mapper)
             return runner.process()
