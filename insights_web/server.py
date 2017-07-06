@@ -10,7 +10,10 @@ from flask import Flask, json, request, jsonify
 from collections import defaultdict
 from insights.settings import web as config
 from insights.core import plugins
-from . import tar_processor
+from insights import util
+from insights.core import archives, specs, evaluators
+from insights.core.evaluators import InsightsEvaluator, SingleEvaluator, InsightsMultiEvaluator
+from insights.core.archives import InvalidArchive
 
 stats = defaultdict(int)
 stats["start_time"] = time.time()
@@ -56,26 +59,30 @@ def initialize_logging():
     logging.getLogger("statsd").setLevel(logging.FATAL)
 
 
+class UploaderLogEvaluator(InsightsEvaluator):
+
+    def post_process(self):
+        uploader_log_content = self.spec_mapper.get_content("uploader_log")
+        if uploader_log_content:
+            path = util.get_path_for_system_id("uploader_log", self.system_id) + ".log"
+            util.ensure_dir(path, dirname=True)
+            with open(path, 'w') as log_fp:
+                log_fp.write("\n".join(uploader_log_content))
+                log_url = "%s/uploader_logs/%s" % (util.get_addr(), self.system_id)
+                logger.info("Uploader Log for system [%s] is available: %s", self.system_id, log_url)
+
+
+class SoSReportEvaluator(SingleEvaluator):
+
+    def format_response(self, response):
+        evaluators.serialize_skips(response["skips"])
+        return response
+
+
 class EngineError(Exception):
     def __init__(self, message, status_code=500):
         super(EngineError, self).__init__(message)
         self.status_code = status_code
-
-
-@app.errorhandler(EngineError)
-def handle_error(error):
-    return error.message, error.status_code, None
-
-
-@app.route("/status")
-def status():
-    if "versions" not in stats:
-        versions = stats["versions"] = {}
-        versions["insights-core"] = {"version": insights.get_nvr(),
-                                     "commit": insights.package_info["COMMIT"]}
-        versions.update(insights.RULES_STATUS)
-    stats["uptime"] = format_seconds(time.time() - stats["start_time"])
-    return jsonify(stats)
 
 
 def get_file_size(file_loc):
@@ -94,6 +101,30 @@ def save_file():
     file_loc = os.path.join(tempfile.mkdtemp(), "tmp.tar.gz")
     request.files["file"].save(file_loc)
     return file_loc
+
+
+def handle(filename, system_id=None, account=None, config=None):
+    try:
+        with archives.TarExtractor() as ex:
+            arc = ex.from_path(filename)
+            os.unlink(filename)
+            spec_mapper = specs.SpecMapper(arc)
+
+            md_str = spec_mapper.get_content("metadata.json", split=False, default="{}")
+            md = json.loads(md_str)
+
+            if md and 'systems' in md:
+                runner = InsightsMultiEvaluator(spec_mapper, system_id, md)
+            elif spec_mapper.get_content("machine-id"):
+                runner = UploaderLogEvaluator(spec_mapper, system_id=system_id)
+            else:
+                runner = SoSReportEvaluator(spec_mapper)
+            return runner.process()
+    except InvalidArchive:
+        raise
+    except:
+        logger.exception("Exception encountered during _handle")
+        raise
 
 
 def handle_results(results, file_size, user_agent):
@@ -120,12 +151,28 @@ def update_stats(results, user_agent):
     stats["bytes_processed"] += results["upload"]["size"]
 
 
+@app.errorhandler(EngineError)
+def handle_error(error):
+    return error.message, error.status_code, None
+
+
+@app.route("/status")
+def status():
+    if "versions" not in stats:
+        versions = stats["versions"] = {}
+        versions["insights-core"] = {"version": insights.get_nvr(),
+                                     "commit": insights.package_info["COMMIT"]}
+        versions.update(insights.RULES_STATUS)
+    stats["uptime"] = format_seconds(time.time() - stats["start_time"])
+    return jsonify(stats)
+
+
 @app.route("/upload/<system_id>", methods=["POST"])
 def upload(system_id):
     user_agent = request.headers.get("User-Agent", "Unknown")
     file_loc = save_file()
     file_size = get_file_size(file_loc)
-    results = tar_processor.handle(file_loc, system_id, config=config)
+    results = handle(file_loc, system_id, config=config)
     shutil.rmtree(os.path.dirname(file_loc))
     response = handle_results(results, file_size, user_agent)
     update_stats(results, user_agent)
