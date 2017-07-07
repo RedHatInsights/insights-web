@@ -1,7 +1,7 @@
-import boto3
 import os
 
 if all(k in os.environ for k in ["s3_bucket", "aws_access_key_id", "aws_secret_access_key"]):
+    import boto3
     bucket = os.environ["s3_bucket"]
     s3_client = boto3.client(
         's3',

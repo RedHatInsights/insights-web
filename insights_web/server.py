@@ -6,6 +6,7 @@ import uuid
 import tempfile
 import os
 import shutil
+import sys
 from flask import Flask, json, request, jsonify
 from collections import defaultdict
 from logstash_formatter import LogstashFormatterV1
@@ -159,5 +160,6 @@ def init():
 
 if __name__ == "__main__":
     init()
-    logger.info("Starting Insights Engine (tornado) on port %s" % config["port"])
-    app.run(host='0.0.0.0', port=config["port"])
+    if s3.s3_client is None:
+        logger.warning("Archive persistence to S3 is disabled")
+    app.run(host='127.0.0.1', port=config["port"])
