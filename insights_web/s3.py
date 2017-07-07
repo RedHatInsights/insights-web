@@ -1,7 +1,7 @@
 import boto3
 import os
 
-if all(lambda k: k in os.environ, ["s3_bucket", "aws_access_key_id", "aws_secret_access_key"]):
+if all(k in os.environ for k in ["s3_bucket", "aws_access_key_id", "aws_secret_access_key"]):
     bucket = os.environ["s3_bucket"]
     access_key_id = os.environ["aws_access_key_id"]
     secret_access_key = os.environ["aws_secret_access_key"]
