@@ -8,6 +8,7 @@ if __name__ == "__main__":
         packages=["insights_web"],
         install_requires=[
             'boto3',
+            'logstash_formatter',
             'insights-core',
             'flask==0.12.1',
             'uWSGI==2.0.15'

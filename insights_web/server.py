@@ -8,6 +8,7 @@ import os
 import shutil
 from flask import Flask, json, request, jsonify
 from collections import defaultdict
+from logstash_formatter import LogstashFormatterV1
 from insights_web import s3
 from insights.settings import web as config
 from insights.core import plugins
@@ -24,37 +25,20 @@ MAX_UPLOAD_SIZE = 1024 * 1024 * 100
 logger = logging.getLogger(__name__)
 
 
-try:
-    import logstash
-except:
-    logstash_enabled = False
-else:
-    logstash_enabled = True
-
-
 def format_seconds(seconds):
     m, s = divmod(seconds, 60)
     h, m = divmod(m, 60)
     return "%02d:%02d:%02d" % (h, m, s)
 
 
-def configure_logger(logger, log_type, propagate=True):
-    l = logging.getLogger(logger)
-    l.propagate = propagate
-    if len(l.handlers) != 0:
-        return
-    l.setLevel(config["log_level"])
-    handler = logstash.LogstashHandler(config["logstash_host"], config["logstash_port"],
-                                       version=1, message_type=log_type)
-    l.addHandler(handler)
-
-
 def initialize_logging():
-    if logstash_enabled and config["distributed"]:
-        configure_logger("", config["log_type"])
-    else:
-        logging.basicConfig()
-        logging.getLogger("").setLevel(config["log_level"])
+    logger = logging.getLogger("")
+    logger.setLevel(config["log_level"])
+    handler = logging.StreamHandler()
+    handler.setFormatter(
+        LogstashFormatterV1(fmt=json.dumps({"extra": {"component": "insights-plugins"}}))
+    )
+    logger.addHandler(handler)
     logging.getLogger("statsd").setLevel(logging.FATAL)
 
 
