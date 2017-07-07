@@ -14,3 +14,4 @@ six==1.10.0
 tornado==4.5.1
 uWSGI==2.0.15
 Werkzeug==0.12.2
+logstash_formatter

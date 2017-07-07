@@ -7,6 +7,7 @@ if __name__ == "__main__":
         description="Insights Web",
         packages=["insights_web"],
         install_requires=[
+            'logstash_formatter',
             'insights-core',
             'flask==0.12.1',
             'uWSGI==2.0.15'
