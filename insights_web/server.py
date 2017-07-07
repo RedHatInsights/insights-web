@@ -127,7 +127,7 @@ def upload(system_id):
     results = handle(extractor, system_id, config=config)
     response = handle_results(results, file_size, user_agent)
     extractor.cleanup()
-    s3.save(file_loc, response["system"].get("system_id"), extractor.content_type)
+    s3.save(file_loc, results["system"].get("system_id"), extractor.content_type)
     shutil.rmtree(os.path.dirname(file_loc))
     update_stats(results, user_agent)
     return response
