@@ -3,11 +3,13 @@ import os
 
 if all(k in os.environ for k in ["s3_bucket", "aws_access_key_id", "aws_secret_access_key"]):
     bucket = os.environ["s3_bucket"]
-    access_key_id = os.environ["aws_access_key_id"]
-    secret_access_key = os.environ["aws_secret_access_key"]
-    s3_client = boto3.client('s3')
+    s3_client = boto3.client(
+        's3',
+        aws_access_key_id=os.environ["aws_access_key_id"],
+        aws_secret_access_key=os.environ["aws_secret_access_key"]
+    )
 else:
-    bucket = access_key_id = secret_access_key = s3_client = None
+    bucket = s3_client = None
 
 
 EXTENSIONS = {
