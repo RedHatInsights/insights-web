@@ -35,7 +35,9 @@ def initialize_logging():
     logger = logging.getLogger("")
     logger.setLevel(config["log_level"])
     handler = logging.StreamHandler()
-    handler.setFormatter(LogstashFormatterV1())
+    handler.setFormatter(
+        LogstashFormatterV1(fmt=json.dumps({"extra": {"component": "insights-plugins"}}))
+    )
     logger.addHandler(handler)
     logging.getLogger("statsd").setLevel(logging.FATAL)
 
