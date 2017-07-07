@@ -8,6 +8,7 @@ import os
 import shutil
 from flask import Flask, json, request, jsonify
 from collections import defaultdict
+from insights_web import s3
 from insights.settings import web as config
 from insights.core import plugins
 from insights.core import archives, specs
@@ -79,8 +80,7 @@ def extract():
     file_size = os.stat(file_loc).st_size
     verify_file_size(file_size)
     extractor = archives.TarExtractor().from_path(file_loc)
-    shutil.rmtree(os.path.dirname(file_loc))
-    return extractor, file_size
+    return extractor, file_size, file_loc
 
 
 def handle(extractor, system_id=None, account=None, config=None):
@@ -141,10 +141,12 @@ def status():
 @app.route("/upload/<system_id>", methods=["POST"])
 def upload(system_id):
     user_agent = request.headers.get("User-Agent", "Unknown")
-    extractor, file_size = extract()
+    extractor, file_size, file_loc = extract()
     results = handle(extractor, system_id, config=config)
     response = handle_results(results, file_size, user_agent)
     extractor.cleanup()
+    s3.save(file_loc, results["system"].get("system_id"), extractor.content_type)
+    shutil.rmtree(os.path.dirname(file_loc))
     update_stats(results, user_agent)
     return response
 
