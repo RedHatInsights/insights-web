@@ -26,6 +26,17 @@ MAX_UPLOAD_SIZE = 1024 * 1024 * 100
 
 logger = logging.getLogger(__name__)
 
+package_info = dict((k, None) for k in ["RELEASE", "COMMIT", "VERSION", "NAME"])
+
+for name in package_info:
+    package_info[name] = pkgutil.get_data(__name__, name).strip()
+
+
+def get_nvr():
+    return "{0}-{1}-{2}".format(package_info["NAME"],
+                                package_info["VERSION"],
+                                package_info["RELEASE"])
+
 
 def format_seconds(seconds):
     m, s = divmod(seconds, 60)
@@ -119,8 +130,8 @@ def status():
         versions = stats["versions"] = {}
         versions["insights-core"] = {"version": insights.get_nvr(),
                                      "commit": insights.package_info["COMMIT"]}
-        versions["insights-web"] = {"version": pkgutil.get_data(__name__, "VERSION").strip(),
-                                    "commit":  pkgutil.get_data(__name__, "COMMIT").strip()}
+        versions["insights-web"] = {"version": get_nvr(),
+                                    "commit":  package_info["COMMIT"]}
         versions.update(insights.RULES_STATUS)
     stats["uptime"] = format_seconds(time.time() - stats["start_time"])
     return jsonify(stats)
