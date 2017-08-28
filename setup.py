@@ -1,9 +1,12 @@
 from setuptools import setup
 
+with open("insights_web/VERSION") as fp:
+    version = fp.read().strip()
+
 if __name__ == "__main__":
     setup(
         name="insights-web",
-        version="0.1.0",
+        version=version,
         description="Insights Web",
         packages=["insights_web"],
         install_requires=[

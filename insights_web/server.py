@@ -7,6 +7,7 @@ import tempfile
 import os
 import shutil
 import sys
+import pkgutil
 from flask import Flask, json, request, jsonify
 from collections import defaultdict
 from logstash_formatter import LogstashFormatterV1
@@ -118,6 +119,8 @@ def status():
         versions = stats["versions"] = {}
         versions["insights-core"] = {"version": insights.get_nvr(),
                                      "commit": insights.package_info["COMMIT"]}
+        versions["insights-web"] = {"version": pkgutil.get_data(__name__, "VERSION").strip(),
+                                    "commit":  pkgutil.get_data(__name__, "COMMIT").strip()}
         versions.update(insights.RULES_STATUS)
     stats["uptime"] = format_seconds(time.time() - stats["start_time"])
     return jsonify(stats)
