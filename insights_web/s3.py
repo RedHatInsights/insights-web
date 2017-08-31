@@ -11,7 +11,7 @@ if all(k in os.environ for k in ["s3_bucket", "aws_access_key_id", "aws_secret_a
         aws_access_key_id=os.environ["aws_access_key_id"],
         aws_secret_access_key=os.environ["aws_secret_access_key"]
     )
-    logger.info("Successfully configured for s3 archive storage")
+    logger.info("Successfully configured for s3 archive storage into bucket: %s", bucket)
 else:
     logger.info("s3 storage not configured")
     bucket = s3_client = None

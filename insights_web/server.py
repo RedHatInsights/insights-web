@@ -10,8 +10,7 @@ import sys
 import pkgutil
 from flask import Flask, json, request, jsonify
 from collections import defaultdict
-from logstash_formatter import LogstashFormatterV1
-from insights_web import s3
+from insights_web import s3, util
 from insights.settings import web as config
 from insights.core import plugins
 from insights.core import archives, specs
@@ -42,17 +41,6 @@ def format_seconds(seconds):
     m, s = divmod(seconds, 60)
     h, m = divmod(m, 60)
     return "%02d:%02d:%02d" % (h, m, s)
-
-
-def initialize_logging():
-    logger = logging.getLogger("")
-    logger.setLevel(config["log_level"])
-    handler = logging.StreamHandler(sys.stdout)
-    handler.setFormatter(
-        LogstashFormatterV1(fmt=json.dumps({"extra": {"component": "insights-plugins"}}))
-    )
-    logger.addHandler(handler)
-    logging.getLogger("statsd").setLevel(logging.FATAL)
 
 
 class EngineError(Exception):
@@ -166,7 +154,7 @@ def heartbeat():
 
 
 def init():
-    initialize_logging()
+    util.initialize_logging()
 
     for module in config["plugin_packages"]:
         plugins.load(module)
