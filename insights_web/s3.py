@@ -30,5 +30,8 @@ def save(path, system_id, content_type):
     # ensure all env vars are properly set and this is an insights archive
     if s3_client and system_id:
         fname = ".".join([system_id, EXTENSIONS[content_type]])
-        with open(path, "rb") as fp:
-            s3_client.upload_fileobj(fp, bucket, fname)
+        try:
+            with open(path, "rb") as fp:
+                s3_client.upload_fileobj(fp, bucket, fname)
+        except Exception as e:
+            logger.warning("Error sending [%s] archive to s3: %s", system_id, e.message)
