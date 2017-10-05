@@ -6,7 +6,6 @@ import uuid
 import tempfile
 import os
 import shutil
-import sys
 import pkgutil
 from flask import Flask, json, request, jsonify
 from collections import defaultdict
@@ -119,7 +118,7 @@ def status():
         versions["insights-core"] = {"version": insights.get_nvr(),
                                      "commit": insights.package_info["COMMIT"]}
         versions["insights-web"] = {"version": get_nvr(),
-                                    "commit":  package_info["COMMIT"]}
+                                    "commit": package_info["COMMIT"]}
         versions.update(insights.RULES_STATUS)
     stats["uptime"] = format_seconds(time.time() - stats["start_time"])
     return jsonify(stats)
@@ -128,6 +127,7 @@ def status():
 @app.route("/upload/<system_id>", methods=["POST"])
 def upload(system_id):
     user_agent = request.headers.get("User-Agent", "Unknown")
+    setattr(util.thread_context, "request_id", request.headers.get("X-Request-Id", "Unknown"))
     extractor, file_size, file_loc = extract()
     results = handle(extractor, system_id, config=config)
     response = handle_results(results, file_size, user_agent)
