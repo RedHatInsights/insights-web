@@ -128,11 +128,12 @@ def status():
 def upload(system_id):
     user_agent = request.headers.get("User-Agent", "Unknown")
     setattr(util.thread_context, "request_id", request.headers.get("X-Request-Id", "Unknown"))
+    account_number = request.headers.get("X-Account", "")
     extractor, file_size, file_loc = extract()
     results = handle(extractor, system_id, config=config)
     response = handle_results(results, file_size, user_agent)
     extractor.cleanup()
-    s3.save(file_loc, results["system"].get("system_id"), extractor.content_type)
+    s3.save(file_loc, results["system"].get("system_id"), extractor.content_type, account_number)
     shutil.rmtree(os.path.dirname(file_loc))
     update_stats(results, user_agent)
     return response
