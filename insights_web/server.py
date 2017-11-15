@@ -11,9 +11,9 @@ from flask import Flask, json, request, jsonify
 from collections import defaultdict
 from insights_web import s3, util
 from insights.settings import web as config
-from insights.core import plugins
+from insights.core import dr
 from insights.core import archives, specs
-from insights.core.evaluators import InsightsEvaluator, SingleEvaluator, InsightsMultiEvaluator
+from insights.core.evaluators import broker_from_spec_mapper, InsightsEvaluator, SingleEvaluator, InsightsMultiEvaluator
 
 stats = defaultdict(int)
 stats["start_time"] = time.time()
@@ -68,18 +68,19 @@ def extract():
 
 
 def handle(extractor, system_id=None, account=None, config=None):
-    spec_mapper = specs.SpecMapper(extractor)
+    def create_evaluator():
+        spec_mapper = specs.SpecMapper(extractor)
+        md_content = spec_mapper.get_content("metadata.json", split=False, default="{}")
+        md = json.loads(md_content)
 
-    md_str = spec_mapper.get_content("metadata.json", split=False, default="{}")
-    md = json.loads(md_str)
+        if md and "systems" in md:
+            return InsightsMultiEvaluator(spec_mapper, metadata=md)
+        b = broker_from_spec_mapper(spec_mapper)
+        if spec_mapper.get_content("machine-id"):
+            return InsightsEvaluator(None, broker=b, system_id=system_id, metadata=md or None)
+        return SingleEvaluator(None, broker=b, metadata=md or None)
 
-    if md and 'systems' in md:
-        runner = InsightsMultiEvaluator(spec_mapper, system_id, md)
-    elif spec_mapper.get_content("machine-id"):
-        runner = InsightsEvaluator(spec_mapper, system_id=system_id)
-    else:
-        runner = SingleEvaluator(spec_mapper)
-    return runner.process()
+    return create_evaluator().process()
 
 
 def handle_results(results, file_size, user_agent):
@@ -156,9 +157,8 @@ def heartbeat():
 
 def init():
     util.initialize_logging()
-
     for module in config["plugin_packages"]:
-        plugins.load(module)
+        dr.load_components(module)
 
 
 if __name__ == "__main__":
