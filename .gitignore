@@ -1,9 +1,15 @@
 bin/
-include/
 build/
 dist/
+include/
+lib/
+share/
 lib/
 lib64
 pip-selfcheck.json
 *.egg-info/
+*.egg
+*.gz
 *.pyc
+*.swp
+*.zip

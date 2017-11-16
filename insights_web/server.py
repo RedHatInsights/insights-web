@@ -11,9 +11,8 @@ from flask import Flask, json, request, jsonify
 from collections import defaultdict
 from insights_web import s3, util
 from insights.settings import web as config
-from insights.core import dr
 from insights.core import archives, specs
-from insights.core.evaluators import broker_from_spec_mapper, InsightsEvaluator, SingleEvaluator, InsightsMultiEvaluator
+from insights.core.evaluators import InsightsEvaluator, SingleEvaluator, InsightsMultiEvaluator
 
 stats = defaultdict(int)
 stats["start_time"] = time.time()
@@ -21,6 +20,7 @@ stats["start_time"] = time.time()
 app = Flask(__name__)
 
 MAX_UPLOAD_SIZE = 1024 * 1024 * 100
+CORE_VERSION = insights.package_info["VERSION"]
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +56,38 @@ def verify_file_size(file_size):
         raise EngineError("Upload has an empty archive body.", 400)
 
 
+if CORE_VERSION >= "3.0.0":
+    from insights.core import dr
+
+    def load_plugins(mod):
+        return dr.load_components(mod)
+else:
+    from insights.core import plugins
+
+    def load_plugins(mod):
+        return plugins.load(mod)
+
+
+def create_evaluator(extractor, system_id):
+    spec_mapper = specs.SpecMapper(extractor)
+    md_content = spec_mapper.get_content("metadata.json", split=False, default="{}")
+    md = json.loads(md_content)
+
+    if md and "systems" in md:
+        return InsightsMultiEvaluator(spec_mapper, metadata=md)
+
+    if CORE_VERSION >= "3.0.0":
+        from insights.core.evaluators import broker_from_spec_mapper
+        b = broker_from_spec_mapper(spec_mapper)
+        if spec_mapper.get_content("machine-id"):
+            return InsightsEvaluator(None, broker=b, system_id=system_id, metadata=md or None)
+        return SingleEvaluator(None, broker=b, metadata=md or None)
+    else:
+        if spec_mapper.get_content("machine-id"):
+            return InsightsEvaluator(spec_mapper, system_id=system_id, metadata=md or None)
+        return SingleEvaluator(spec_mapper, metadata=md or None)
+
+
 def extract():
     if "file" not in request.files:
         raise EngineError("No 'file' key found in form part", 400)
@@ -68,19 +100,7 @@ def extract():
 
 
 def handle(extractor, system_id=None, account=None, config=None):
-    def create_evaluator():
-        spec_mapper = specs.SpecMapper(extractor)
-        md_content = spec_mapper.get_content("metadata.json", split=False, default="{}")
-        md = json.loads(md_content)
-
-        if md and "systems" in md:
-            return InsightsMultiEvaluator(spec_mapper, metadata=md)
-        b = broker_from_spec_mapper(spec_mapper)
-        if spec_mapper.get_content("machine-id"):
-            return InsightsEvaluator(None, broker=b, system_id=system_id, metadata=md or None)
-        return SingleEvaluator(None, broker=b, metadata=md or None)
-
-    return create_evaluator().process()
+    return create_evaluator(extractor, system_id).process()
 
 
 def handle_results(results, file_size, user_agent):
@@ -158,7 +178,7 @@ def heartbeat():
 def init():
     util.initialize_logging()
     for module in config["plugin_packages"]:
-        dr.load_components(module)
+        load_plugins(module)
 
 
 if __name__ == "__main__":
