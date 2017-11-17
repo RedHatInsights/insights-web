@@ -1,3 +1,3 @@
 #!/bin/bash
 
-exec uwsgi --http-socket :8080 --master --module wsgi --thunder-lock --processes 4
+exec uwsgi --http-socket :8080 --master --module wsgi --thunder-lock --processes 1
