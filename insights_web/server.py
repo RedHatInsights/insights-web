@@ -7,12 +7,13 @@ import tempfile
 import os
 import shutil
 import pkgutil
-from flask import Flask, json, request, jsonify
 from collections import defaultdict
-from insights_web import s3, util
+from flask import Flask, json, request, jsonify
+
+from insights.core import archives, dr
+from insights.core.evaluators import InsightsEvaluator, SingleEvaluator
 from insights.settings import web as config
-from insights.core import archives, specs
-from insights.core.evaluators import InsightsEvaluator, SingleEvaluator, InsightsMultiEvaluator
+from insights_web import s3, util
 
 stats = defaultdict(int)
 stats["start_time"] = time.time()
@@ -20,11 +21,10 @@ stats["start_time"] = time.time()
 app = Flask(__name__)
 
 MAX_UPLOAD_SIZE = 1024 * 1024 * 100
-CORE_VERSION = insights.package_info["VERSION"]
 
 logger = logging.getLogger(__name__)
 
-package_info = dict((k, None) for k in ["RELEASE", "COMMIT", "VERSION", "NAME"])
+package_info = dict.fromkeys(["RELEASE", "COMMIT", "VERSION", "NAME"])
 
 for name in package_info:
     package_info[name] = pkgutil.get_data(__name__, name).strip()
@@ -56,36 +56,15 @@ def verify_file_size(file_size):
         raise EngineError("Upload has an empty archive body.", 400)
 
 
-if CORE_VERSION >= "3.0.0":
-    from insights.core import dr
+def create_evaluator(tmp_dir, system_id):
+    from insights.core.hydration import create_context
 
-    def load_plugins(mod):
-        return dr.load_components(mod)
-else:
-    from insights.core import plugins
-
-    def load_plugins(mod):
-        return plugins.load(mod)
-
-
-def create_evaluator(extractor, system_id):
-    spec_mapper = specs.SpecMapper(extractor)
-    md_content = spec_mapper.get_content("metadata.json", split=False, default="{}")
-    md = json.loads(md_content)
-
-    if md and "systems" in md:
-        return InsightsMultiEvaluator(spec_mapper, metadata=md)
-
-    if CORE_VERSION >= "3.0.0":
-        from insights.core.evaluators import broker_from_spec_mapper
-        b = broker_from_spec_mapper(spec_mapper)
-        if spec_mapper.get_content("machine-id"):
-            return InsightsEvaluator(None, broker=b, system_id=system_id, metadata=md or None)
-        return SingleEvaluator(None, broker=b, metadata=md or None)
-    else:
-        if spec_mapper.get_content("machine-id"):
-            return InsightsEvaluator(spec_mapper, system_id=system_id, metadata=md or None)
-        return SingleEvaluator(spec_mapper, metadata=md or None)
+    broker = dr.Broker()
+    ctx = create_context(tmp_dir)
+    broker[ctx.__class__] = ctx
+    if system_id:
+        return InsightsEvaluator(broker=broker, system_id=system_id)
+    return SingleEvaluator(broker=broker)
 
 
 def extract():
@@ -95,12 +74,11 @@ def extract():
     request.files["file"].save(file_loc)
     file_size = os.stat(file_loc).st_size
     verify_file_size(file_size)
-    extractor = archives.TarExtractor().from_path(file_loc)
-    return extractor, file_size, file_loc
+    return file_size, file_loc
 
 
-def handle(extractor, system_id=None, account=None, config=None):
-    return create_evaluator(extractor, system_id).process()
+def handle(tmp_dir, system_id=None, account=None, config=None):
+    return create_evaluator(tmp_dir, system_id).process()
 
 
 def handle_results(results, file_size, user_agent):
@@ -150,11 +128,11 @@ def upload(system_id):
     user_agent = request.headers.get("User-Agent", "Unknown")
     setattr(util.thread_context, "request_id", request.headers.get("X-Request-Id", "Unknown"))
     account_number = request.headers.get("X-Account", "")
-    extractor, file_size, file_loc = extract()
-    results = handle(extractor, system_id, config=config)
-    response = handle_results(results, file_size, user_agent)
-    extractor.cleanup()
-    s3.save(file_loc, results["system"].get("system_id"), extractor.content_type, account_number)
+    file_size, file_loc = extract()
+    with archives.extract(file_loc) as ex:
+        results = handle(ex.tmp_dir, system_id, config=config)
+        response = handle_results(results, file_size, user_agent)
+    s3.save(file_loc, results["system"].get("system_id"), ex.content_type, account_number)
     shutil.rmtree(os.path.dirname(file_loc))
     update_stats(results, user_agent)
     return response
@@ -178,7 +156,7 @@ def heartbeat():
 def init():
     util.initialize_logging()
     for module in config["plugin_packages"]:
-        load_plugins(module)
+        dr.load_components(module)
 
 
 if __name__ == "__main__":
