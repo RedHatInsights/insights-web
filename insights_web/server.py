@@ -19,7 +19,7 @@ stats["start_time"] = time.time()
 
 app = Flask(__name__)
 
-MAX_UPLOAD_SIZE = 1024 * 1024 * 100
+MAX_UPLOAD_SIZE = config.get("max_upload_size", 100) * 1024 * 1024
 CORE_VERSION = insights.package_info["VERSION"]
 
 logger = logging.getLogger(__name__)
@@ -49,7 +49,7 @@ class EngineError(Exception):
 
 
 def verify_file_size(file_size):
-    if file_size > MAX_UPLOAD_SIZE:
+    if file_size > MAX_UPLOAD_SIZE and MAX_UPLOAD_SIZE > 0:
         error_msg = "Upload is too big. %s/%s bytes" % (file_size, MAX_UPLOAD_SIZE)
         raise EngineError(error_msg, 413)
     if file_size == 0:
